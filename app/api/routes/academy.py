@@ -7,11 +7,14 @@ from app.api.deps import CurrentAdmin, CurrentUser, DbSession
 from app.schemas.academy import (
     BodyMeasurementCreate,
     BodyMeasurementRead,
+    ClassCreate,
+    ClassRead,
     CheckinCreate,
     CheckinRead,
     MemberCreate,
     MemberEnrollmentCreate,
     MemberRead,
+    MemberReportRead,
     MemberSummaryRead,
     PaymentCreate,
     PaymentMethodCreate,
@@ -22,6 +25,7 @@ from app.schemas.academy import (
 )
 from app.services.academy import (
     create_body_measurement,
+    create_class,
     create_checkin,
     create_member,
     create_member_enrollment,
@@ -31,6 +35,7 @@ from app.services.academy import (
     list_body_measurements,
     list_checkins,
     list_member_payment_history,
+    list_member_reports,
     list_member_summaries,
     list_payment_methods,
     list_payments,
@@ -44,6 +49,11 @@ router = APIRouter()
 @router.get("/members", response_model=list[MemberSummaryRead])
 def read_members(_: CurrentAdmin, db: DbSession) -> list[MemberSummaryRead]:
     return [MemberSummaryRead.model_validate(item) for item in list_member_summaries(db)]
+
+
+@router.get("/members/report", response_model=list[MemberReportRead])
+def read_member_reports(_: CurrentAdmin, db: DbSession) -> list[MemberReportRead]:
+    return [MemberReportRead.model_validate(item) for item in list_member_reports(db)]
 
 
 @router.post("/members", response_model=MemberRead, status_code=status.HTTP_201_CREATED)
@@ -98,6 +108,11 @@ def create_plan_record(payload: PlanCreate, _: CurrentAdmin, db: DbSession) -> P
     return PlanRead.model_validate(create_plan(db, payload))
 
 
+@router.post("/classes", response_model=ClassRead, status_code=status.HTTP_201_CREATED)
+def create_class_record(payload: ClassCreate, _: CurrentAdmin, db: DbSession) -> ClassRead:
+    return ClassRead.model_validate(create_class(db, payload))
+
+
 @router.get("/payments", response_model=list[PaymentRead])
 def read_payments(_: CurrentAdmin, db: DbSession) -> list[PaymentRead]:
     return [PaymentRead.model_validate(item) for item in list_payments(db)]
@@ -109,8 +124,8 @@ def read_member_payment_history(member_id: UUID, _: CurrentAdmin, db: DbSession)
 
 
 @router.post("/payments", response_model=PaymentRead, status_code=status.HTTP_201_CREATED)
-def create_payment_record(payload: PaymentCreate, _: CurrentAdmin, db: DbSession) -> PaymentRead:
-    return PaymentRead.model_validate(create_payment(db, payload))
+def create_payment_record(payload: PaymentCreate, current_user: CurrentUser, db: DbSession) -> PaymentRead:
+    return PaymentRead.model_validate(create_payment(db, payload, operator_id=current_user.id))
 
 
 @router.get("/payment-methods", response_model=list[PaymentMethodRead])

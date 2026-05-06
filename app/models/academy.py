@@ -3,10 +3,14 @@ from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID, uuid4
 
-from sqlalchemy import Date, DateTime, Enum, ForeignKey, Numeric, String, Text, Uuid, func
+from sqlalchemy import JSON, Date, DateTime, Enum, ForeignKey, Numeric, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+
+
+def _enum_values(enum_class: type[StrEnum]) -> list[str]:
+    return [item.value for item in enum_class]
 
 
 class MemberStatus(StrEnum):
@@ -52,7 +56,7 @@ class Member(Base):
     country: Mapped[str] = mapped_column(String(100), nullable=False, default="Brasil", server_default="Brasil")
     zip_code: Mapped[str] = mapped_column(String(20), nullable=False)
     status: Mapped[MemberStatus] = mapped_column(
-        Enum(MemberStatus, name="member_status", native_enum=False),
+        Enum(MemberStatus, name="member_status", native_enum=False, values_callable=_enum_values),
         nullable=False,
         default=MemberStatus.ACTIVE,
         server_default=MemberStatus.ACTIVE.value,
@@ -75,6 +79,18 @@ class Plan(Base):
     duration_days: Mapped[int] = mapped_column(nullable=False)
 
 
+class AcademyClass(Base):
+    __tablename__ = "classes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    frequency: Mapped[int] = mapped_column(nullable=False)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="RESTRICT"), index=True, nullable=False)
+    days: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class PaymentMethod(Base):
     __tablename__ = "payment_methods"
 
@@ -88,9 +104,10 @@ class Payment(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     member_id: Mapped[UUID] = mapped_column(ForeignKey("members.id", ondelete="CASCADE"), index=True, nullable=False)
     method_id: Mapped[int] = mapped_column(ForeignKey("payment_methods.id", ondelete="RESTRICT"), index=True, nullable=False)
+    operator_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), index=True, nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     status: Mapped[PaymentStatus] = mapped_column(
-        Enum(PaymentStatus, name="payment_status", native_enum=False),
+        Enum(PaymentStatus, name="payment_status", native_enum=False, values_callable=_enum_values),
         nullable=False,
         default=PaymentStatus.SUCCESS,
         server_default=PaymentStatus.SUCCESS.value,
@@ -107,7 +124,7 @@ class Checkin(Base):
     checkin_datetime: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     checkout_datetime: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     type: Mapped[CheckinType] = mapped_column(
-        Enum(CheckinType, name="checkin_type", native_enum=False),
+        Enum(CheckinType, name="checkin_type", native_enum=False, values_callable=_enum_values),
         nullable=False,
     )
 
@@ -144,7 +161,7 @@ class BodyPhoto(Base):
     image_url: Mapped[str] = mapped_column(String(500), nullable=False)
     taken_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     type: Mapped[BodyPhotoType] = mapped_column(
-        Enum(BodyPhotoType, name="body_photo_type", native_enum=False),
+        Enum(BodyPhotoType, name="body_photo_type", native_enum=False, values_callable=_enum_values),
         nullable=False,
     )
 

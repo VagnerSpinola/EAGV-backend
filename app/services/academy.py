@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -6,11 +6,12 @@ from sqlalchemy.orm import Session
 from uuid import UUID, uuid4
 from fastapi import UploadFile
 
-from app.models.academy import BodyMeasurement, Checkin, Member, MemberStatus, Payment, PaymentMethod, PaymentStatus, Plan
+from app.models.academy import AcademyClass, BodyMeasurement, Checkin, Member, MemberStatus, Payment, PaymentMethod, PaymentStatus, Plan
 from app.models.user import User, UserRole
 from app.schemas.academy import (
     BodyMeasurementCreate,
     BodyMeasurementInput,
+    ClassCreate,
     CheckinCreate,
     MemberCreate,
     MemberEnrollmentCreate,
@@ -41,6 +42,43 @@ def list_member_summaries(db: Session) -> list[dict[str, object]]:
             "status": member.status,
         }
         for member, user in rows
+    ]
+
+
+def list_member_reports(db: Session) -> list[dict[str, object]]:
+    rows = db.execute(
+        select(Member, User, Plan)
+        .join(User, User.id == Member.user_id)
+        .outerjoin(Plan, Plan.id == Member.plan_id)
+        .order_by(User.full_name.asc(), User.email.asc())
+    ).all()
+    return [
+        {
+            "id": member.id,
+            "user_id": member.user_id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "is_active": user.is_active,
+            "plan_id": member.plan_id,
+            "plan_name": plan.name if plan is not None else None,
+            "plan_price": plan.price if plan is not None else None,
+            "plan_duration_days": plan.duration_days if plan is not None else None,
+            "cpf": member.cpf,
+            "birth_date": member.birth_date,
+            "phone": member.phone,
+            "gender": member.gender,
+            "photo_url": member.photo_url,
+            "street": member.street,
+            "number": member.number,
+            "city": member.city,
+            "state": member.state,
+            "country": member.country,
+            "zip_code": member.zip_code,
+            "status": member.status,
+            "created_at": member.created_at,
+            "updated_at": member.updated_at,
+        }
+        for member, user, plan in rows
     ]
 
 
@@ -212,6 +250,18 @@ def create_plan(db: Session, plan_in: PlanCreate) -> Plan:
     return plan
 
 
+def create_class(db: Session, class_in: ClassCreate) -> AcademyClass:
+    selected_plan = db.execute(select(Plan).where(Plan.id == class_in.plan_id)).scalar_one_or_none()
+    if selected_plan is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Selected plan not found.")
+
+    academy_class = AcademyClass(**class_in.model_dump())
+    db.add(academy_class)
+    db.commit()
+    db.refresh(academy_class)
+    return academy_class
+
+
 def list_payment_methods(db: Session) -> list[PaymentMethod]:
     return db.execute(select(PaymentMethod).order_by(PaymentMethod.description.asc())).scalars().all()
 
@@ -236,6 +286,7 @@ def _build_payment_read(payment: Payment, payment_method: PaymentMethod) -> dict
         "member_id": payment.member_id,
         "amount": payment.amount,
         "method_id": payment.method_id,
+        "operator_id": payment.operator_id,
         "method_description": payment_method.description,
         "status": payment.status,
         "created_at": payment.created_at,
@@ -270,7 +321,7 @@ def list_member_payment_history(db: Session, member_id: UUID) -> list[dict[str, 
     return [_build_payment_read(payment, payment_method) for payment, payment_method in rows]
 
 
-def create_payment(db: Session, payment_in: PaymentCreate) -> dict[str, object]:
+def create_payment(db: Session, payment_in: PaymentCreate, *, operator_id: int) -> dict[str, object]:
     member = get_member_by_id(db, payment_in.member_id)
     if member is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found.")
@@ -289,6 +340,7 @@ def create_payment(db: Session, payment_in: PaymentCreate) -> dict[str, object]:
         member_id=payment_in.member_id,
         amount=payment_in.amount,
         method_id=payment_in.method_id,
+        operator_id=operator_id,
         status=PaymentStatus.SUCCESS,
         idempotency_key=f"pay-{uuid4().hex}",
     )
@@ -303,6 +355,21 @@ def create_payment(db: Session, payment_in: PaymentCreate) -> dict[str, object]:
     return _build_payment_read(payment, payment_method)
 
 
+def _resolve_reference_datetime(value: datetime | None) -> datetime:
+    reference_datetime = value or datetime.now(timezone.utc)
+    if reference_datetime.tzinfo is None:
+        return reference_datetime.replace(tzinfo=timezone.utc)
+
+    return reference_datetime.astimezone(timezone.utc)
+
+
+def _block_member_for_payment_refusal(db: Session, member: Member, detail: str) -> None:
+    member.status = MemberStatus.BLOCKED
+    db.add(member)
+    db.commit()
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+
 def list_checkins(db: Session) -> list[Checkin]:
     return db.execute(select(Checkin).order_by(Checkin.checkin_datetime.desc())).scalars().all()
 
@@ -312,7 +379,65 @@ def create_checkin(db: Session, checkin_in: CheckinCreate) -> Checkin:
     if member is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found.")
 
+    user = db.execute(select(User).where(User.id == member.user_id)).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found for the selected member.")
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Check-in refused: linked user is inactive.",
+        )
+
+    if member.status != MemberStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Check-in refused: member status is '{member.status.value}'.",
+        )
+
+    if member.plan_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Check-in refused: member has no plan linked.",
+        )
+
+    plan = db.execute(select(Plan).where(Plan.id == member.plan_id)).scalar_one_or_none()
+    if plan is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found for the selected member.")
+
+    latest_successful_payment = db.execute(
+        select(Payment)
+        .where(Payment.member_id == member.id, Payment.status == PaymentStatus.SUCCESS)
+        .order_by(Payment.created_at.desc(), Payment.id.desc())
+    ).scalars().first()
+
+    if latest_successful_payment is None:
+        _block_member_for_payment_refusal(
+            db,
+            member,
+            "Check-in refused: no successful payment was found for the current plan. Member status changed to 'blocked'.",
+        )
+
+    if latest_successful_payment.amount < plan.price:
+        _block_member_for_payment_refusal(
+            db,
+            member,
+            "Check-in refused: latest successful payment does not cover the current plan price. Member status changed to 'blocked'.",
+        )
+
+    reference_datetime = _resolve_reference_datetime(checkin_in.checkin_datetime)
+    payment_created_at = _resolve_reference_datetime(latest_successful_payment.created_at)
+    paid_until = payment_created_at + timedelta(days=plan.duration_days)
+
+    if reference_datetime > paid_until:
+        _block_member_for_payment_refusal(
+            db,
+            member,
+            f"Check-in refused: plan payment expired on {paid_until.date().isoformat()}. Member status changed to 'blocked'.",
+        )
+
     payload = checkin_in.model_dump(exclude_none=True)
+    payload.setdefault("checkin_datetime", reference_datetime)
     checkin = Checkin(**payload)
     db.add(checkin)
     db.commit()

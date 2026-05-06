@@ -49,6 +49,32 @@ class MemberSummaryRead(BaseModel):
     status: MemberStatus
 
 
+class MemberReportRead(BaseModel):
+    id: UUID
+    user_id: int
+    full_name: str | None = None
+    email: EmailStr
+    is_active: bool
+    plan_id: int | None = None
+    plan_name: str | None = None
+    plan_price: Decimal | None = None
+    plan_duration_days: int | None = None
+    cpf: str
+    birth_date: date
+    phone: str
+    gender: str
+    photo_url: str | None = None
+    street: str
+    number: str
+    city: str
+    state: str
+    country: str
+    zip_code: str
+    status: MemberStatus
+    created_at: datetime
+    updated_at: datetime
+
+
 class PaymentMethodRead(BaseModel):
     id: int
     description: str
@@ -72,6 +98,21 @@ class PlanRead(PlanCreate):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ClassCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=160)
+    description: str | None = None
+    frequency: int = Field(gt=0)
+    plan_id: int = Field(gt=0)
+    days: list[str] = Field(min_length=1)
+
+
+class ClassRead(ClassCreate):
+    id: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class PaymentCreate(BaseModel):
     member_id: UUID
     amount: Decimal = Field(gt=0)
@@ -83,9 +124,12 @@ class PaymentRead(BaseModel):
     member_id: UUID
     amount: Decimal
     method_id: int
+    operator_id: int
     method_description: str
     status: PaymentStatus
     created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CheckinCreate(BaseModel):

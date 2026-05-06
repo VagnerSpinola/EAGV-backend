@@ -16,7 +16,21 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute(sa.text("UPDATE payments SET status = 'success' WHERE status = 'paid'"))
+    op.execute(
+        sa.text(
+            """
+            UPDATE payments
+            SET status = CASE lower(status)
+                WHEN 'paid' THEN 'success'
+                WHEN 'success' THEN 'success'
+                WHEN 'pending' THEN 'pending'
+                WHEN 'failed' THEN 'failed'
+                WHEN 'canceled' THEN 'canceled'
+                ELSE status
+            END
+            """
+        )
+    )
     op.alter_column("payments", "status", server_default="success")
 
     op.execute(sa.text("ALTER TABLE payments DROP CONSTRAINT IF EXISTS payment_status"))
@@ -29,7 +43,20 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(sa.text("UPDATE payments SET status = 'paid' WHERE status = 'success'"))
+    op.execute(
+        sa.text(
+            """
+            UPDATE payments
+            SET status = CASE lower(status)
+                WHEN 'success' THEN 'paid'
+                WHEN 'pending' THEN 'pending'
+                WHEN 'failed' THEN 'failed'
+                WHEN 'canceled' THEN 'canceled'
+                ELSE status
+            END
+            """
+        )
+    )
     op.alter_column("payments", "status", server_default="pending")
 
     op.drop_constraint("ck_payments_status_payment_status", "payments", type_="check")
