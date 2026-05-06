@@ -5,10 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
+from app.core.bootstrap import initialize_application_data
 from app.core.config import settings
 
 
 assets_directory = Path(__file__).resolve().parents[1] / "assets"
+
+initialize_application_data()
 
 app = FastAPI(title=settings.project_name)
 app.add_middleware(

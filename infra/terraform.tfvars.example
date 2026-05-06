@@ -1,0 +1,23 @@
+project_name              = "eagv-backend"
+environment               = "dev"
+location                  = "Brazil South"
+resource_group_name       = "rg-eagv-backend-dev"
+app_service_sku_name      = "F1"
+python_version            = "3.11"
+bootstrap_admin_email     = "admin@eagv.com"
+bootstrap_admin_full_name = "Administrador EAGV"
+
+# Fill this before planning or applying.
+jwt_secret_key = "replace-before-apply"
+
+allowed_cors_origins = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+]
+
+tags = {
+  system      = "EAGV"
+  environment = "dev"
+  owner       = "platform"
+  stack       = "backend"
+}

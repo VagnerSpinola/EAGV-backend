@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from enum import StrEnum
 
-from sqlalchemy import Boolean, DateTime, Enum, String, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Enum, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -29,12 +29,24 @@ class UserSector(StrEnum):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "role = 'client' OR sector IS NOT NULL",
+            name="ck_users_sector_required_for_non_client",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole, name="user_role", native_enum=False),
+        Enum(
+            UserRole,
+            name="user_role",
+            native_enum=False,
+            values_callable=lambda enum_class: [item.value for item in enum_class],
+        ),
         nullable=False,
         default=UserRole.CLIENT,
         server_default=UserRole.CLIENT.value,

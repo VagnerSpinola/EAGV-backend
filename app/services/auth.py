@@ -13,7 +13,8 @@ from app.core.security import (
     get_password_hash,
     verify_password,
 )
-from app.models.user import User
+from app.models.academy import Member
+from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserProfileUpdate
 
 
@@ -22,7 +23,7 @@ def get_user_by_email(db: Session, email: str) -> User | None:
     return db.execute(statement).scalar_one_or_none()
 
 
-def create_user(db: Session, user_in: UserCreate) -> User:
+def create_user(db: Session, user_in: UserCreate, *, auto_commit: bool = True) -> User:
     existing_user = get_user_by_email(db, email=user_in.email)
     if existing_user is not None:
         raise HTTPException(
@@ -30,15 +31,25 @@ def create_user(db: Session, user_in: UserCreate) -> User:
             detail="A user with this email already exists.",
         )
 
+    if user_in.role != UserRole.CLIENT and user_in.sector is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Sector is required for non-client users.",
+        )
+
     user = User(
         email=user_in.email,
         full_name=user_in.full_name,
+        image_url=user_in.image_url,
         role=user_in.role,
         sector=user_in.sector,
         hashed_password=get_password_hash(user_in.password),
     )
     db.add(user)
-    db.commit()
+    if auto_commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(user)
     return user
 
@@ -109,6 +120,11 @@ def update_current_user(db: Session, user: User, user_in: UserProfileUpdate) -> 
         user.full_name = user_in.full_name
 
     if "sector" in user_in.model_fields_set:
+        if user.role != UserRole.CLIENT and user_in.sector is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Sector is required for non-client users.",
+            )
         user.sector = user_in.sector
 
     if user_in.current_password and user_in.new_password:
@@ -119,6 +135,23 @@ def update_current_user(db: Session, user: User, user_in: UserProfileUpdate) -> 
             )
         user.hashed_password = get_password_hash(user_in.new_password)
 
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def get_user_by_id(db: Session, user_id: int) -> User | None:
+    statement = select(User).where(User.id == user_id)
+    return db.execute(statement).scalar_one_or_none()
+
+
+def update_user_image(db: Session, user: User, image_url: str) -> User:
+    user.image_url = image_url
+    member = db.execute(select(Member).where(Member.user_id == user.id)).scalar_one_or_none()
+    if member is not None:
+        member.photo_url = image_url
+        db.add(member)
     db.add(user)
     db.commit()
     db.refresh(user)

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
 
 from app.api.deps import CurrentAdmin, CurrentUser, DbSession
 from app.schemas.auth import (
@@ -12,11 +12,14 @@ from app.schemas.user import UserCreate, UserProfileUpdate, UserRead
 from app.services.auth import (
     authenticate_user,
     create_user,
+    get_user_by_id,
     issue_access_token,
     issue_password_reset_token,
     reset_user_password,
+    update_user_image,
     update_current_user,
 )
+from app.services.user_images import upload_user_image
 
 
 router = APIRouter()
@@ -72,3 +75,22 @@ def update_me(payload: UserProfileUpdate, current_user: CurrentUser, db: DbSessi
     user = update_current_user(db, user=current_user, user_in=payload)
     access_token = issue_access_token(user.email)
     return TokenResponse(access_token=access_token, user=UserRead.model_validate(user))
+
+
+@router.post("/me/image", response_model=TokenResponse)
+def upload_me_image(current_user: CurrentUser, db: DbSession, file: UploadFile = File(...)) -> TokenResponse:
+    image_url = upload_user_image(file=file, user_id=current_user.id)
+    user = update_user_image(db, user=current_user, image_url=image_url)
+    access_token = issue_access_token(user.email)
+    return TokenResponse(access_token=access_token, user=UserRead.model_validate(user))
+
+
+@router.post("/users/{user_id}/image", response_model=UserRead)
+def upload_user_image_by_admin(user_id: int, _: CurrentAdmin, db: DbSession, file: UploadFile = File(...)) -> UserRead:
+    user = get_user_by_id(db, user_id=user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    image_url = upload_user_image(file=file, user_id=user_id)
+    updated_user = update_user_image(db, user=user, image_url=image_url)
+    return UserRead.model_validate(updated_user)

@@ -8,12 +8,20 @@ from app.models.user import UserRole, UserSector
 class UserBase(BaseModel):
     email: EmailStr
     full_name: str | None = Field(default=None, max_length=255)
+    image_url: str | None = Field(default=None, max_length=500)
     role: UserRole = UserRole.CLIENT
     sector: UserSector | None = None
 
 
 class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=128)
+
+    @model_validator(mode="after")
+    def validate_sector_for_role(self) -> "UserCreate":
+        if self.role != UserRole.CLIENT and self.sector is None:
+            raise ValueError("Sector is required for non-client users.")
+
+        return self
 
 
 class UserProfileUpdate(BaseModel):
