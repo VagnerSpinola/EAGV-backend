@@ -179,6 +179,28 @@ SYSTEM_SETTINGS_SEED: Sequence[dict[str, object]] = (
         "timezone": "America/Sao_Paulo",
         "is_maintenance_mode": False,
     },
+    {
+        "id": 9,
+        "slug": "administracao",
+        "sector": "admin",
+        "system_name": "Centro Administrativo",
+        "short_name": "Administracao",
+        "tagline": "Operacao interna, retaguarda e gestao institucional do EAGV.",
+        "description": "Modulo administrativo para operacao interna, acompanhamento institucional e rotinas do time de administracao.",
+        "logo_url": "assets/images/eagv_logo.png",
+        "logo_mark_url": "assets/images/eagv_logo.png",
+        "favicon_url": "assets/images/eagv_logo.png",
+        "hero_image_url": "assets/images/eagv_logo.png",
+        "login_background_url": "assets/images/eagv_logo.png",
+        "support_email": "admin@eagv.com",
+        "support_phone": "+55 11 4100-0002",
+        "primary_color": "#3C4557",
+        "secondary_color": "#D9A441",
+        "default_locale": "pt-BR",
+        "timezone": "America/Sao_Paulo",
+        "active": True,
+        "is_maintenance_mode": False,
+    },
 )
 
 PAYMENT_METHODS_SEED: Sequence[dict[str, object]] = (

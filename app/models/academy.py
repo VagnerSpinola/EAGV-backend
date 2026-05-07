@@ -176,9 +176,17 @@ class BodyMeasurement(Base):
     thigh_right: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
     calf_left: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
     calf_right: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    visceral_fat: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    bmi: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
 
 class BodyPhoto(Base):
@@ -187,10 +195,20 @@ class BodyPhoto(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     member_id: Mapped[UUID] = mapped_column(ForeignKey("members.id", ondelete="CASCADE"), index=True, nullable=False)
     image_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    front_photo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    side_photo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    back_photo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     taken_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     type: Mapped[BodyPhotoType] = mapped_column(
         Enum(BodyPhotoType, name="body_photo_type", native_enum=False, values_callable=_enum_values),
         nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
 
@@ -199,8 +217,24 @@ class PhysicalAssessment(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     member_id: Mapped[UUID] = mapped_column(ForeignKey("members.id", ondelete="CASCADE"), index=True, nullable=False)
+    trainer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), index=True, nullable=True)
+    body_measurement_id: Mapped[UUID | None] = mapped_column(ForeignKey("body_measurements.id", ondelete="SET NULL"), nullable=True)
     vo2_estimate: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
     resting_heart_rate: Mapped[int | None] = mapped_column(nullable=True)
     flexibility_score: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
     strength_score: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
     posture_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    posture_analysis: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mobility_score: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    cardio_conditioning: Mapped[str | None] = mapped_column(Text, nullable=True)
+    injury_history: Mapped[str | None] = mapped_column(Text, nullable=True)
+    limitations: Mapped[str | None] = mapped_column(Text, nullable=True)
+    recommendations: Mapped[str | None] = mapped_column(Text, nullable=True)
+    assessment_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )

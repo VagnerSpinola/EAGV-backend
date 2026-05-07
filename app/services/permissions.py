@@ -33,11 +33,13 @@ def get_allowed_navigation_levels(user: User) -> list[NavigationLevel]:
 
 
 def filter_system_settings_for_user(user: User, settings: Sequence[SystemSettings]) -> list[SystemSettings]:
+    active_settings = [profile for profile in settings if profile.active]
+
     if user.role == UserRole.ADMIN:
-        return list(settings)
+        return list(active_settings)
 
     if user.role == UserRole.STAFF and user.sector is not None:
         user_sector = normalize_sector(user.sector)
-        return [profile for profile in settings if normalize_sector(profile.sector) == user_sector]
+        return [profile for profile in active_settings if normalize_sector(profile.sector) == user_sector]
 
     return []

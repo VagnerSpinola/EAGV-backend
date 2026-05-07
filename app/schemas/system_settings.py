@@ -33,6 +33,7 @@ class SystemSettingsWrite(BaseModel):
     secondary_color: str | None = None
     default_locale: str = "pt-BR"
     timezone: str = "America/Sao_Paulo"
+    active: bool = True
     is_maintenance_mode: bool = False
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -83,6 +84,7 @@ class SystemSettingsRead(BaseModel):
     secondary_color: str | None
     default_locale: str
     timezone: str
+    active: bool
     is_maintenance_mode: bool
     created_at: datetime
     updated_at: datetime

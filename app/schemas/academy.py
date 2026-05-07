@@ -242,6 +242,8 @@ class BodyMeasurementCreate(BaseModel):
     thigh_right: Decimal | None = None
     calf_left: Decimal | None = None
     calf_right: Decimal | None = None
+    visceral_fat: Decimal | None = None
+    bmi: Decimal | None = None
     notes: str | None = None
 
 
@@ -260,6 +262,8 @@ class BodyMeasurementInput(BaseModel):
     thigh_right: Decimal | None = None
     calf_left: Decimal | None = None
     calf_right: Decimal | None = None
+    visceral_fat: Decimal | None = None
+    bmi: Decimal | None = None
     notes: str | None = None
 
 
@@ -271,5 +275,6 @@ class BodyMeasurementRead(BodyMeasurementCreate):
     id: UUID
     created_by: int
     created_at: datetime
+    updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

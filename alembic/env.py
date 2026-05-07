@@ -2,6 +2,7 @@ from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine import make_url
 
 from app.core.config import settings
 from app.core.database import Base
@@ -9,7 +10,11 @@ from app.models import User
 
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
+database_url = make_url(settings.database_url)
+if database_url.get_backend_name() != "sqlite" and settings.database_hostaddr:
+    database_url = database_url.update_query_dict({"hostaddr": settings.database_hostaddr})
+
+config.set_main_option("sqlalchemy.url", database_url.render_as_string(hide_password=False).replace("%", "%%"))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

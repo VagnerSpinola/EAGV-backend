@@ -27,6 +27,7 @@ class SystemSettings(Base):
     secondary_color: Mapped[str | None] = mapped_column(String(20), nullable=True)
     default_locale: Mapped[str] = mapped_column(String(20), nullable=False, default="pt-BR")
     timezone: Mapped[str] = mapped_column(String(100), nullable=False, default="America/Sao_Paulo")
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_maintenance_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
