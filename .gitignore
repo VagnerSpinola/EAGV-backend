@@ -5,6 +5,15 @@ __pycache__/
 
 
 assets/
+
+# Local deployment and test artifacts
+.deploy/
+test-data/
+
+# Local infrastructure state
+infra/.terraform/
+infra/terraform.tfstate
+infra/terraform.tfstate.backup
 # C extensions
 *.so
 
