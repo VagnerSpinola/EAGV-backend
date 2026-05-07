@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     project_name: str = "EAGV Backend"
     api_v1_prefix: str = "/api/v1"
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/eagv"
+    database_hostaddr: str | None = None
     database_auto_initialize: bool = False
     azure_storage_connection_string: str | None = None
     azure_storage_container_name: str = "system-settings-assets"

@@ -27,6 +27,7 @@ tests/
 ## Configuração
 
 1. Crie o arquivo `.env` com base em `.env.example`.
+	Se o banco estiver no Azure e a maquina resolver o hostname no `nslookup`, mas o Python falhar em `getaddrinfo`, preencha `DATABASE_HOSTADDR` com o IP atual do servidor Azure sem alterar o hostname da `DATABASE_URL`.
 2. Suba o PostgreSQL:
 
 ```bash

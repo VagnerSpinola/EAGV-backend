@@ -14,7 +14,9 @@ if database_url.get_backend_name() == "sqlite":
 	if database_url.database and database_url.database != ":memory:":
 		Path(database_url.database).parent.mkdir(parents=True, exist_ok=True)
 	engine_kwargs["connect_args"] = {"check_same_thread": False}
+elif settings.database_hostaddr:
+	database_url = database_url.update_query_dict({"hostaddr": settings.database_hostaddr})
 
-engine = create_engine(settings.database_url, **engine_kwargs)
+engine = create_engine(database_url.render_as_string(hide_password=False), **engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
