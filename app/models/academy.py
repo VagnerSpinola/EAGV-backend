@@ -3,7 +3,7 @@ from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, Date, DateTime, Enum, ForeignKey, Numeric, String, Text, Uuid, func
+from sqlalchemy import JSON, Date, DateTime, Enum, ForeignKey, Numeric, String, Text, Uuid, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -43,7 +43,6 @@ class Member(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True, nullable=False)
-    plan_id: Mapped[int | None] = mapped_column(ForeignKey("plans.id", ondelete="SET NULL"), index=True, nullable=True)
     cpf: Mapped[str] = mapped_column(String(14), unique=True, index=True, nullable=False)
     birth_date: Mapped[date] = mapped_column(Date, nullable=False)
     phone: Mapped[str] = mapped_column(String(30), nullable=False)
@@ -88,7 +87,19 @@ class AcademyClass(Base):
     frequency: Mapped[int] = mapped_column(nullable=False)
     plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id", ondelete="RESTRICT"), index=True, nullable=False)
     days: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    schedules: Mapped[list[dict[str, str | None]]] = mapped_column(JSON, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class MemberClassAssignment(Base):
+    __tablename__ = "member_class_assignments"
+    __table_args__ = (UniqueConstraint("member_id", "class_id", name="uq_member_class_assignments_member_class"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    member_id: Mapped[UUID] = mapped_column(ForeignKey("members.id", ondelete="CASCADE"), index=True, nullable=False)
+    class_id: Mapped[int] = mapped_column(ForeignKey("classes.id", ondelete="CASCADE"), index=True, nullable=False)
+    assigned_by: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class PaymentMethod(Base):
@@ -113,6 +124,23 @@ class Payment(Base):
         server_default=PaymentStatus.SUCCESS.value,
     )
     idempotency_key: Mapped[str] = mapped_column(String(120), unique=True, index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class PaymentClassCoverage(Base):
+    __tablename__ = "payment_class_coverages"
+    __table_args__ = (UniqueConstraint("payment_id", "class_id", name="uq_payment_class_coverages_payment_class"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    payment_id: Mapped[int] = mapped_column(ForeignKey("payments.id", ondelete="CASCADE"), index=True, nullable=False)
+    class_id: Mapped[int] = mapped_column(ForeignKey("classes.id", ondelete="RESTRICT"), index=True, nullable=False)
+    class_title_snapshot: Mapped[str] = mapped_column(String(160), nullable=False)
+    plan_id_snapshot: Mapped[int] = mapped_column(nullable=False)
+    plan_name_snapshot: Mapped[str] = mapped_column(String(120), nullable=False)
+    plan_price_snapshot: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    plan_duration_days_snapshot: Mapped[int] = mapped_column(nullable=False)
+    covered_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    covered_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 

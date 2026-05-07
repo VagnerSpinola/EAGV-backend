@@ -1,14 +1,14 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from app.models.academy import CheckinType, MemberStatus, PaymentStatus
 
 
 class MemberBase(BaseModel):
-    plan_id: int | None = None
     cpf: str = Field(min_length=11, max_length=14)
     birth_date: date
     phone: str = Field(min_length=8, max_length=30)
@@ -45,7 +45,8 @@ class MemberSummaryRead(BaseModel):
     email: EmailStr
     cpf: str
     phone: str
-    plan_id: int | None = None
+    assigned_class_count: int = 0
+    assigned_plan_names: list[str] = Field(default_factory=list)
     status: MemberStatus
 
 
@@ -55,10 +56,8 @@ class MemberReportRead(BaseModel):
     full_name: str | None = None
     email: EmailStr
     is_active: bool
-    plan_id: int | None = None
-    plan_name: str | None = None
-    plan_price: Decimal | None = None
-    plan_duration_days: int | None = None
+    assigned_class_titles: list[str] = Field(default_factory=list)
+    assigned_plan_names: list[str] = Field(default_factory=list)
     cpf: str
     birth_date: date
     phone: str
@@ -98,25 +97,70 @@ class PlanRead(PlanCreate):
     model_config = ConfigDict(from_attributes=True)
 
 
+ClassDay = Literal["segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"]
+
+
+class ClassScheduleInput(BaseModel):
+    day: ClassDay
+    start_time: time
+    end_time: time
+
+    @model_validator(mode="after")
+    def validate_time_range(self) -> "ClassScheduleInput":
+        if self.end_time <= self.start_time:
+            raise ValueError("Class end_time must be later than start_time.")
+
+        return self
+
+
 class ClassCreate(BaseModel):
     title: str = Field(min_length=1, max_length=160)
     description: str | None = None
     frequency: int = Field(gt=0)
     plan_id: int = Field(gt=0)
-    days: list[str] = Field(min_length=1)
+    schedules: list[ClassScheduleInput] = Field(min_length=1)
 
 
-class ClassRead(ClassCreate):
+class ClassRead(BaseModel):
     id: int
+    title: str
+    description: str | None = None
+    frequency: int
+    plan_id: int
+    days: list[ClassDay]
+    schedules: list[ClassScheduleInput]
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class MemberClassAssignmentWrite(BaseModel):
+    class_ids: list[int] = Field(default_factory=list)
+
+
+class MemberClassAssignmentItemRead(BaseModel):
+    assignment_id: int
+    class_id: int
+    title: str
+    description: str | None = None
+    frequency: int
+    plan_id: int
+    days: list[ClassDay]
+    schedules: list[ClassScheduleInput]
+    assigned_by: int
+    assigned_at: datetime
+
+
+class MemberClassAssignmentsRead(BaseModel):
+    member_id: UUID
+    classes: list[MemberClassAssignmentItemRead]
 
 
 class PaymentCreate(BaseModel):
     member_id: UUID
     amount: Decimal = Field(gt=0)
     method_id: int = Field(gt=0)
+    class_ids: list[int] = Field(min_length=1)
 
 
 class PaymentRead(BaseModel):
@@ -147,6 +191,39 @@ class CheckinRead(BaseModel):
     type: CheckinType
 
     model_config = ConfigDict(from_attributes=True)
+
+
+CheckinPaymentCoverageStatus = Literal["paid", "expired", "payment_required"]
+
+
+class CheckinPaymentStatusClassRead(BaseModel):
+    class_id: int
+    title: str
+    plan_id: int
+    plan_name: str
+    plan_price: Decimal
+    plan_duration_days: int
+    status: CheckinPaymentCoverageStatus
+    last_payment_id: int | None = None
+    last_payment_at: datetime | None = None
+    paid_from: datetime | None = None
+    paid_until: datetime | None = None
+
+
+class CheckinPaymentStatusSummaryRead(BaseModel):
+    assigned_class_count: int
+    paid_class_count: int
+    expired_class_count: int
+    pending_class_count: int
+    total_assigned_amount: Decimal
+    total_pending_amount: Decimal
+
+
+class CheckinPaymentStatusRead(BaseModel):
+    message: str
+    member_id: UUID
+    classes: list[CheckinPaymentStatusClassRead] = Field(default_factory=list)
+    summary: CheckinPaymentStatusSummaryRead
 
 
 class BodyMeasurementCreate(BaseModel):

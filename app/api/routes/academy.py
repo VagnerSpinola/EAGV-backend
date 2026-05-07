@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
@@ -8,8 +9,11 @@ from app.schemas.academy import (
     BodyMeasurementCreate,
     BodyMeasurementRead,
     ClassCreate,
+    MemberClassAssignmentsRead,
+    MemberClassAssignmentWrite,
     ClassRead,
     CheckinCreate,
+    CheckinPaymentStatusRead,
     CheckinRead,
     MemberCreate,
     MemberEnrollmentCreate,
@@ -32,14 +36,18 @@ from app.services.academy import (
     create_payment,
     create_payment_method,
     create_plan,
+    get_member_checkin_payment_status,
+    get_member_class_assignments,
     list_body_measurements,
     list_checkins,
+    list_classes,
     list_member_payment_history,
     list_member_reports,
     list_member_summaries,
     list_payment_methods,
     list_payments,
     list_plans,
+    replace_member_class_assignments,
 )
 
 
@@ -111,6 +119,40 @@ def create_plan_record(payload: PlanCreate, _: CurrentAdmin, db: DbSession) -> P
 @router.post("/classes", response_model=ClassRead, status_code=status.HTTP_201_CREATED)
 def create_class_record(payload: ClassCreate, _: CurrentAdmin, db: DbSession) -> ClassRead:
     return ClassRead.model_validate(create_class(db, payload))
+
+
+@router.get("/classes", response_model=list[ClassRead])
+def read_classes(_: CurrentAdmin, db: DbSession) -> list[ClassRead]:
+    return [ClassRead.model_validate(item) for item in list_classes(db)]
+
+
+@router.get("/members/{member_id}/class-assignments", response_model=MemberClassAssignmentsRead)
+def read_member_class_assignments(member_id: UUID, _: CurrentAdmin, db: DbSession) -> MemberClassAssignmentsRead:
+    return MemberClassAssignmentsRead.model_validate(get_member_class_assignments(db, member_id))
+
+
+@router.get("/members/{member_id}/checkin-payment-status", response_model=CheckinPaymentStatusRead)
+def read_member_checkin_payment_status(
+    member_id: UUID,
+    _: CurrentAdmin,
+    db: DbSession,
+    reference_datetime: datetime | None = None,
+) -> CheckinPaymentStatusRead:
+    return CheckinPaymentStatusRead.model_validate(
+        get_member_checkin_payment_status(db, member_id, reference_datetime=reference_datetime)
+    )
+
+
+@router.put("/members/{member_id}/class-assignments", response_model=MemberClassAssignmentsRead)
+def replace_member_class_assignment_records(
+    member_id: UUID,
+    payload: MemberClassAssignmentWrite,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> MemberClassAssignmentsRead:
+    return MemberClassAssignmentsRead.model_validate(
+        replace_member_class_assignments(db, member_id, payload, assigned_by=current_user.id)
+    )
 
 
 @router.get("/payments", response_model=list[PaymentRead])
